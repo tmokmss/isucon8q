@@ -3,6 +3,7 @@ all:
 	make db
 
 init:
+	@sudo systemctl stop torb.perl
 	@sudo systemctl disable torb.perl
 	@sudo systemctl enable torb.ruby
 	make ruby
