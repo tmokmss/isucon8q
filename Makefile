@@ -38,5 +38,6 @@ reset-log:
 	make mariadb
 
 lineprof:
-	journalctl -u torb.ruby -f
+	export LESS='-R'
+	less /home/isucon/log/stdout
 
