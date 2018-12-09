@@ -1,5 +1,7 @@
 source 'https://rubygems.org'
 
+gem 'rack-lineprof', :git => 'git://github.com/kainosnoema/rack-lineprof.git',
+                     :branch => 'master'
 gem 'puma'
 gem 'sinatra'
 gem 'erubi'
