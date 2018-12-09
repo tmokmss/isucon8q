@@ -61,7 +61,7 @@ module Torb
           events = db.query('SELECT * FROM events ORDER BY id ASC').select(&where)
           sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num')
 
-          events.each do |e|
+          response = events.map do |e|
             # zero fill
             e['total']   = 0
             e['remains'] = 0
@@ -104,7 +104,7 @@ module Torb
           db.query('ROLLBACK')
         end
 
-        events
+        response
       end
 
       def get_event(event_id, login_user_id = nil)
