@@ -203,7 +203,8 @@ module Torb
     end
 
     get '/api/users/:id', login_required: true do |user_id|
-      if user_id != session[:user_id]
+      user = db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
+      if user['id'] != get_login_user['id']
         halt_with_error 403, 'forbidden'
       end
 
