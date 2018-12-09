@@ -1,4 +1,5 @@
 all:
+	make db-backup
 	make ruby
 	make db
 	make reset-log
@@ -14,6 +15,10 @@ ruby:
 
 db:
 	@sudo systemctl restart mariadb
+
+db-backup:
+	@sudo mysqldump -u isucon --password=isucon torb > /var/log/mariadb/backup-`date +%m%d-%H%M%S`
+
 mariadb:
 	@sudo systemctl restart mariadb.service
 h2o:
