@@ -36,3 +36,7 @@ reset-log:
 	@sudo rm /var/log/h2o/access.log
 	make h2o
 	make mariadb
+
+lineprof:
+	journalctl -u torb.ruby -f
+

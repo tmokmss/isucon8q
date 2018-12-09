@@ -3,9 +3,12 @@ require 'sinatra/base'
 require 'erubi'
 require 'mysql2'
 require 'mysql2-cs-bind'
+require 'rack-lineprof'
+
 
 module Torb
   class Web < Sinatra::Base
+    use Rack::Lineprof, profile: './web.rb'
     configure :development do
       require 'sinatra/reloader'
       register Sinatra::Reloader
