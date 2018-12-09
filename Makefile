@@ -41,3 +41,5 @@ lineprof:
 	export LESS='-R'
 	less /home/isucon/log/stdout
 
+err:
+	less /home/isucon/log/stderr

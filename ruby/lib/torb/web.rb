@@ -206,9 +206,12 @@ module Torb
     end
 
     get '/api/users/:id', login_required: true do |user_id|
-      if user_id != session[:user_id]
+      return if session[:user_id].nil?
+      if user_id != session[:user_id].to_s
         halt_with_error 403, 'forbidden'
       end
+
+      user = db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
 
       rows = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user['id'])
       recent_reservations = rows.map do |row|
