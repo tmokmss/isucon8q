@@ -8,11 +8,15 @@ require 'rack-lineprof'
 
 module Torb
   class Web < Sinatra::Base
-    use Rack::Lineprof, profile: './web.rb'
+    #use Rack::Lineprof, profile: './web.rb'
     configure :development do
       require 'sinatra/reloader'
       register Sinatra::Reloader
     end
+
+    SHEETS_PRICE = {'S' => 5000, 'A' => 3000, 'B' => 1000, 'C' => 0}.freeze
+    MAX_SHEETS_NUM = 1000.freeze
+    MAX_SHEETS_NUM_RANK = {'S' => 50, 'A' => 150, 'B' => 300, 'C' => 500}.freeze
 
     set :root, File.expand_path('../..', __dir__)
     set :sessions, key: 'torb_session', expire_after: 3600
@@ -79,35 +83,32 @@ module Torb
         event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
         return unless event
 
+        reservations = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event['id'])
+        res_hash = reservations.map {|reservation| [reservation['sheet_id'], reservation]}.to_h
+
         # zero fill
-        event['total']   = 0
+        event['total'] = MAX_SHEETS_NUM
         event['remains'] = 0
         event['sheets'] = {}
         %w[S A B C].each do |rank|
-          event['sheets'][rank] = { 'total' => 0, 'remains' => 0, 'detail' => [] }
+          event['sheets'][rank] = {'total' => MAX_SHEETS_NUM_RANK[rank], 'remains' => 0, 'detail' => [], 'price' => SHEETS_PRICE[rank] + event['price']}
         end
 
-        sheets = db.query('SELECT * FROM sheets ORDER BY `rank`, num')
-        sheets.each do |sheet|
-          event['sheets'][sheet['rank']]['price'] ||= event['price'] + sheet['price']
-          event['total'] += 1
-          event['sheets'][sheet['rank']]['total'] += 1
+        (1..MAX_SHEETS_NUM).each do |sheet_id|
+          reservation = res_hash[sheet_id]
+          sheet_rank = sheets_rank(sheet_id)
+          sheet = {'num' => sheet_id_to_num(sheet_id)}
 
-          reservation = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND sheet_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event['id'], sheet['id']).first
-          if reservation
-            sheet['mine']        = true if login_user_id && reservation['user_id'] == login_user_id
-            sheet['reserved']    = true
-            sheet['reserved_at'] = reservation['reserved_at'].to_i
-          else
+          if reservation.nil?
             event['remains'] += 1
-            event['sheets'][sheet['rank']]['remains'] += 1
+            event['sheets'][sheet_rank]['remains'] += 1
+          else
+            sheet['mine'] = true if login_user_id && reservation['user_id'] == login_user_id
+            sheet['reserved'] = true
+            sheet['reserved_at'] = reservation['reserved_at'].to_i
           end
 
           event['sheets'][sheet['rank']]['detail'].push(sheet)
-
-          sheet.delete('id')
-          sheet.delete('price')
-          sheet.delete('rank')
         end
 
         event['public'] = event.delete('public_fg')
