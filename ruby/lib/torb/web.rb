@@ -83,7 +83,7 @@ module Torb
         event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
         return unless event
 
-        reservations = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event['id'])
+        reservations = db.xquery('SELECT * FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event_id)
         res_hash = reservations.map {|reservation| [reservation['sheet_id'], reservation]}.to_h
 
         # zero fill
@@ -108,7 +108,7 @@ module Torb
             sheet['reserved_at'] = reservation['reserved_at'].to_i
           end
 
-          event['sheets'][sheet['rank']]['detail'].push(sheet)
+          event['sheets'][sheet_rank]['detail'].push(sheet)
         end
 
         event['public'] = event.delete('public_fg')
