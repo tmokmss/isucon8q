@@ -44,27 +44,27 @@ module Torb
     helpers do
       def db
         Thread.current[:db] ||= Mysql2::Client.new(
-          host: ENV['DB_HOST'],
-          port: ENV['DB_PORT'],
-          username: ENV['DB_USER'],
-          password: ENV['DB_PASS'],
-          database: ENV['DB_DATABASE'],
-          database_timezone: :utc,
-          cast_booleans: true,
-          reconnect: true,
-          init_command: 'SET SESSION sql_mode="STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"',
+            host: ENV['DB_HOST'],
+            port: ENV['DB_PORT'],
+            username: ENV['DB_USER'],
+            password: ENV['DB_PASS'],
+            database: ENV['DB_DATABASE'],
+            database_timezone: :utc,
+            cast_booleans: true,
+            reconnect: true,
+            init_command: 'SET SESSION sql_mode="STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"',
         )
       end
 
       def get_events(where = nil)
-        where ||= ->(e) { e['public_fg'] }
+        where ||= ->(e) {e['public_fg']}
 
         db.query('BEGIN')
         begin
-          event_ids = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).map { |e| e['id'] }
+          event_ids = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).map {|e| e['id']}
           events = event_ids.map do |event_id|
             event = get_event(event_id)
-            event['sheets'].each { |sheet| sheet.delete('detail') }
+            event['sheets'].each {|sheet| sheet.delete('detail')}
             event
           end
           db.query('COMMIT')
@@ -117,7 +117,7 @@ module Torb
       end
 
       def sanitize_event(event)
-        sanitized = event.dup  # shallow clone
+        sanitized = event.dup # shallow clone
         sanitized.delete('price')
         sanitized.delete('public')
         sanitized.delete('closed')
@@ -145,11 +145,11 @@ module Torb
       end
 
       def halt_with_error(status = 500, error = 'unknown')
-        halt status, { error: error }.to_json
+        halt status, {error: error}.to_json
       end
 
       def render_report_csv(reports)
-        reports = reports.sort_by { |report| report[:sold_at] }
+        reports = reports.sort_by {|report| report[:sold_at]}
 
         keys = %i[reservation_id event_id rank num price user_id sold_at canceled_at]
         body = keys.join(',')
@@ -160,15 +160,39 @@ module Torb
         end
 
         headers({
-          'Content-Type'        => 'text/csv; charset=UTF-8',
-          'Content-Disposition' => 'attachment; filename="report.csv"',
-        })
+                    'Content-Type' => 'text/csv; charset=UTF-8',
+                    'Content-Disposition' => 'attachment; filename="report.csv"',
+                })
         body
+      end
+
+      def sheets_rank(sheet_id)
+        if sheet_id > 500
+          return 'C'
+        elsif sheet_id > 200
+          return 'B'
+        elsif sheet_id > 50
+          return 'A'
+        else
+          return 'S'
+        end
+      end
+
+      def sheet_id_to_num(sheet_id)
+        if sheet_id > 500
+          return sheet_id - 500
+        elsif sheet_id > 200
+          return sheet_id - 200
+        elsif sheet_id > 50
+          return sheet_id - 50
+        else
+          return sheet_id
+        end
       end
     end
 
     get '/' do
-      @user   = get_login_user
+      @user = get_login_user
       @events = get_events.map(&method(:sanitize_event))
       erb :index
     end
@@ -180,9 +204,9 @@ module Torb
     end
 
     post '/api/users' do
-      nickname   = body_params['nickname']
+      nickname = body_params['nickname']
       login_name = body_params['login_name']
-      password   = body_params['password']
+      password = body_params['password']
 
       db.query('BEGIN')
       begin
@@ -202,7 +226,7 @@ module Torb
       end
 
       status 201
-      { id: user_id, nickname: nickname }.to_json
+      {id: user_id, nickname: nickname}.to_json
     end
 
     get '/api/users/:id', login_required: true do |user_id|
@@ -222,13 +246,13 @@ module Torb
         event.delete('remains')
 
         {
-          id:          row['id'],
-          event:       event,
-          sheet_rank:  row['sheet_rank'],
-          sheet_num:   row['sheet_num'],
-          price:       price,
-          reserved_at: row['reserved_at'].to_i,
-          canceled_at: row['canceled_at']&.to_i,
+            id: row['id'],
+            event: event,
+            sheet_rank: row['sheet_rank'],
+            sheet_num: row['sheet_num'],
+            price: price,
+            reserved_at: row['reserved_at'].to_i,
+            canceled_at: row['canceled_at']&.to_i,
         }
       end
 
@@ -238,7 +262,7 @@ module Torb
       rows = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5', user['id'])
       recent_events = rows.map do |row|
         event = get_event(row['event_id'])
-        event['sheets'].each { |_, sheet| sheet.delete('detail') }
+        event['sheets'].each {|_, sheet| sheet.delete('detail')}
         event
       end
       user['recent_events'] = recent_events
@@ -249,9 +273,9 @@ module Torb
 
     post '/api/actions/login' do
       login_name = body_params['login_name']
-      password   = body_params['password']
+      password = body_params['password']
 
-      user      = db.xquery('SELECT * FROM users WHERE login_name = ?', login_name).first
+      user = db.xquery('SELECT * FROM users WHERE login_name = ?', login_name).first
       pass_hash = db.xquery('SELECT SHA2(?, 256) AS pass_hash', password).first['pass_hash']
       halt_with_error 401, 'authentication_failed' if user.nil? || pass_hash != user['pass_hash']
 
@@ -283,7 +307,7 @@ module Torb
     post '/api/events/:id/actions/reserve', login_required: true do |event_id|
       rank = body_params['sheet_rank']
 
-      user  = get_login_user
+      user = get_login_user
       event = get_event(event_id, user['id'])
       halt_with_error 404, 'invalid_event' unless event && event['public']
       halt_with_error 400, 'invalid_rank' unless validate_rank(rank)
@@ -308,14 +332,14 @@ module Torb
       end
 
       status 202
-      { id: reservation_id, sheet_rank: rank, sheet_num: sheet['num'] } .to_json
+      {id: reservation_id, sheet_rank: rank, sheet_num: sheet['num']}.to_json
     end
 
     delete '/api/events/:id/sheets/:rank/:num/reservation', login_required: true do |event_id, rank, num|
-      user  = get_login_user
+      user = get_login_user
       event = get_event(event_id, user['id'])
       halt_with_error 404, 'invalid_event' unless event && event['public']
-      halt_with_error 404, 'invalid_rank'  unless validate_rank(rank)
+      halt_with_error 404, 'invalid_rank' unless validate_rank(rank)
 
       sheet = db.xquery('SELECT * FROM sheets WHERE `rank` = ? AND num = ?', rank, num).first
       halt_with_error 404, 'invalid_sheet' unless sheet
@@ -345,17 +369,17 @@ module Torb
 
     get '/admin/' do
       @administrator = get_login_administrator
-      @events = get_events(->(_) { true }) if @administrator
+      @events = get_events(->(_) {true}) if @administrator
 
       erb :admin
     end
 
     post '/admin/api/actions/login' do
       login_name = body_params['login_name']
-      password   = body_params['password']
+      password = body_params['password']
 
       administrator = db.xquery('SELECT * FROM administrators WHERE login_name = ?', login_name).first
-      pass_hash     = db.xquery('SELECT SHA2(?, 256) AS pass_hash', password).first['pass_hash']
+      pass_hash = db.xquery('SELECT SHA2(?, 256) AS pass_hash', password).first['pass_hash']
       halt_with_error 401, 'authentication_failed' if administrator.nil? || pass_hash != administrator['pass_hash']
 
       session['administrator_id'] = administrator['id']
@@ -370,14 +394,14 @@ module Torb
     end
 
     get '/admin/api/events', admin_login_required: true do
-      events = get_events(->(_) { true })
+      events = get_events(->(_) {true})
       events.to_json
     end
 
     post '/admin/api/events', admin_login_required: true do
-      title  = body_params['title']
+      title = body_params['title']
       public = body_params['public'] || false
-      price  = body_params['price']
+      price = body_params['price']
 
       db.query('BEGIN')
       begin
@@ -431,14 +455,14 @@ module Torb
       reservations = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
       reports = reservations.map do |reservation|
         {
-          reservation_id: reservation['id'],
-          event_id:       event['id'],
-          rank:           reservation['sheet_rank'],
-          num:            reservation['sheet_num'],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + reservation['sheet_price'],
+            reservation_id: reservation['id'],
+            event_id: event['id'],
+            rank: reservation['sheet_rank'],
+            num: reservation['sheet_num'],
+            user_id: reservation['user_id'],
+            sold_at: reservation['reserved_at'].iso8601,
+            canceled_at: reservation['canceled_at']&.iso8601 || '',
+            price: reservation['event_price'] + reservation['sheet_price'],
         }
       end
 
@@ -449,14 +473,14 @@ module Torb
       reservations = db.query('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.id AS event_id, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id ORDER BY reserved_at ASC FOR UPDATE')
       reports = reservations.map do |reservation|
         {
-          reservation_id: reservation['id'],
-          event_id:       reservation['event_id'],
-          rank:           reservation['sheet_rank'],
-          num:            reservation['sheet_num'],
-          user_id:        reservation['user_id'],
-          sold_at:        reservation['reserved_at'].iso8601,
-          canceled_at:    reservation['canceled_at']&.iso8601 || '',
-          price:          reservation['event_price'] + reservation['sheet_price'],
+            reservation_id: reservation['id'],
+            event_id: reservation['event_id'],
+            rank: reservation['sheet_rank'],
+            num: reservation['sheet_num'],
+            user_id: reservation['user_id'],
+            sold_at: reservation['reserved_at'].iso8601,
+            canceled_at: reservation['canceled_at']&.iso8601 || '',
+            price: reservation['event_price'] + reservation['sheet_price'],
         }
       end
 
