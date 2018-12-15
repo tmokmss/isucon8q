@@ -17,7 +17,6 @@ module Torb
     SHEETS_PRICE = {'S' => 5000, 'A' => 3000, 'B' => 1000, 'C' => 0}.freeze
     MAX_SHEETS_NUM = 1000.freeze
     MAX_SHEETS_NUM_RANK = {'S' => 50, 'A' => 150, 'B' => 300, 'C' => 500}.freeze
-    @events = {}
 
     set :root, File.expand_path('../..', __dir__)
     set :sessions, key: 'torb_session', expire_after: 3600
@@ -81,7 +80,8 @@ module Torb
       end
 
       def get_event(event_id, login_user_id = nil)
-        return @events[event_id] unless @events[event_id].nil?
+        @events_cache ||= {}
+        return @events_cache[event_id] unless @events_cache[event_id].nil?
 
         event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
         return unless event
@@ -117,7 +117,7 @@ module Torb
         event['public'] = event.delete('public_fg')
         event['closed'] = event.delete('closed_fg')
 
-        @events[event_id] = event
+        @events_cache[event_id] = event
       end
 
       def sanitize_event(event)
