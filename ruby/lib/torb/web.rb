@@ -14,6 +14,7 @@ module Torb
       register Sinatra::Reloader
     end
 
+    SHEETS = %w[S A B C].freeze
     SHEETS_PRICE = {'S' => 5000, 'A' => 3000, 'B' => 1000, 'C' => 0}.freeze
     MAX_SHEETS_NUM = 1000.freeze
     MAX_SHEETS_NUM_RANK = {'S' => 50, 'A' => 150, 'B' => 300, 'C' => 500}.freeze
@@ -87,7 +88,7 @@ module Torb
         event['total'] = MAX_SHEETS_NUM
         event['remains'] = MAX_SHEETS_NUM
         event['sheets'] = {}
-        %w[S A B C].each do |rank|
+        SHEETS.each do |rank|
           event['sheets'][rank] = {'total' => MAX_SHEETS_NUM_RANK[rank], 'remains' => MAX_SHEETS_NUM_RANK[rank], 'price' => SHEETS_PRICE[rank] + event['price']}
         end
 
@@ -105,7 +106,7 @@ module Torb
 
       def get_event(event_id, login_user_id = nil)
         @events_cache ||= {}
-        return @events_cache[event_id] unless @events_cache[event_id].nil?
+        #return @events_cache[event_id] unless @events_cache[event_id].nil?
 
         event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
         return unless event
@@ -117,7 +118,7 @@ module Torb
         event['total'] = MAX_SHEETS_NUM
         event['remains'] = 0
         event['sheets'] = {}
-        %w[S A B C].each do |rank|
+        SHEETS.each do |rank|
           event['sheets'][rank] = {'total' => MAX_SHEETS_NUM_RANK[rank], 'remains' => 0, 'detail' => [], 'price' => SHEETS_PRICE[rank] + event['price']}
         end
 
