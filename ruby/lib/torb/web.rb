@@ -82,7 +82,7 @@ module Torb
         event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
         return unless event
 
-        reservations = db.xquery('SELECT sheet_id reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event_id)
+        reservations = db.xquery('SELECT sheet_id FROM reservations WHERE event_id = ? AND canceled_at IS NULL', event_id)
 
         # zero fill
         event['total'] = MAX_SHEETS_NUM
