@@ -269,7 +269,7 @@ module Torb
       rows = db.xquery('SELECT r.* FROM reservations r WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user_id)
       recent_reservations = rows.map do |row|
         event = get_event_no_detail(row['event_id'])
-        sheet_rank = sheets_rank(rows['sheet_id'])
+        sheet_rank = sheets_rank(row['sheet_id'])
         price = event['price'] + SHEETS_PRICE[sheet_rank]
         event.delete('sheets')
         event.delete('total')
