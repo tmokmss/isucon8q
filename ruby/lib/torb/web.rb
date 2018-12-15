@@ -266,10 +266,11 @@ module Torb
 
       user = db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
 
-      rows = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user['id'])
+      rows = db.xquery('SELECT r.* FROM reservations r WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user_id)
       recent_reservations = rows.map do |row|
         event = get_event_no_detail(row['event_id'])
-        price = event['price'] + SHEETS_PRICE[row['sheet_rank']]
+        sheet_rank = sheets_rank(rows['sheet_id'])
+        price = event['price'] + SHEETS_PRICE[sheet_rank]
         event.delete('sheets')
         event.delete('total')
         event.delete('remains')
@@ -277,8 +278,8 @@ module Torb
         {
             id: row['id'],
             event: event,
-            sheet_rank: row['sheet_rank'],
-            sheet_num: row['sheet_num'],
+            sheet_rank: sheet_rank,
+            sheet_num: sheet_id_to_num(row['sheet_id']),
             price: price,
             reserved_at: row['reserved_at'].to_i,
             canceled_at: row['canceled_at']&.to_i,
@@ -286,12 +287,11 @@ module Torb
       end
 
       user['recent_reservations'] = recent_reservations
-      user['total_price'] = db.xquery('SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL', user['id']).first['total_price']
+      user['total_price'] = db.xquery('SELECT IFNULL(SUM(e.price + s.price), 0) AS total_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.user_id = ? AND r.canceled_at IS NULL', user_id).first['total_price']
 
-      rows = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5', user['id'])
+      rows = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5', user_id)
       recent_events = rows.map do |row|
         event = get_event_no_detail(row['event_id'])
-        event['sheets'].each {|_, sheet| sheet.delete('detail')}
         event
       end
       user['recent_events'] = recent_events
