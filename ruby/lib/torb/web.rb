@@ -268,8 +268,8 @@ module Torb
 
       user = db.xquery('SELECT id, nickname FROM users WHERE id = ?', user_id).first
 
-      rows_reserve = db.xquery('SELECT r.* FROM reservations r WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user_id)
-      rows_event = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5', user_id)
+      rows_reserve = db.xquery('SELECT * FROM reservations WHERE user_id = ? ORDER BY IFNULL(canceled_at, reserved_at) DESC LIMIT 5', user_id)
+      rows_event = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? ORDER BY IFNULL(canceled_at, reserved_at) DESC LIMIT 5', user_id)
 
       event_ids = rows_reserve.map {|row| row['event_id']}
       event_ids.concat(rows_event.map {|row| row['event_id']}).uniq!
