@@ -166,7 +166,7 @@ module Torb
       end
 
       def validate_rank(rank)
-        db.xquery('SELECT COUNT(*) AS total_sheets FROM sheets WHERE `rank` = ?', rank).first['total_sheets'] > 0
+        SHEETS_PRICE.keys.include?(rank)
       end
 
       def body_params
@@ -239,7 +239,7 @@ module Torb
 
       db.query('BEGIN')
       begin
-        duplicated = db.xquery('SELECT * FROM users WHERE login_name = ?', login_name).first
+        duplicated = db.xquery('SELECT id FROM users WHERE login_name = ?', login_name).first
         if duplicated
           db.query('ROLLBACK')
           halt_with_error 409, 'duplicated'
