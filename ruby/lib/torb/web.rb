@@ -67,9 +67,7 @@ module Torb
         begin
           event_ids = db.query('SELECT * FROM events ORDER BY id ASC').select(&where).map {|e| e['id']}
           events = event_ids.map do |event_id|
-            event = get_event(event_id)
-            event['sheets'].each {|sheet| sheet.delete('detail')}
-            event
+            event = get_event_no_detail(event_id)
           end
           db.query('COMMIT')
         rescue
@@ -77,6 +75,32 @@ module Torb
         end
 
         events
+      end
+
+      def get_event_no_detail(event_id)
+        event = db.xquery('SELECT * FROM events WHERE id = ?', event_id).first
+        return unless event
+
+        reservations = db.xquery('SELECT sheet_id reserved_at FROM reservations WHERE event_id = ? AND canceled_at IS NULL GROUP BY event_id, sheet_id HAVING reserved_at = MIN(reserved_at)', event_id)
+
+        # zero fill
+        event['total'] = MAX_SHEETS_NUM
+        event['remains'] = MAX_SHEETS_NUM
+        event['sheets'] = {}
+        %w[S A B C].each do |rank|
+          event['sheets'][rank] = {'total' => MAX_SHEETS_NUM_RANK[rank], 'remains' => MAX_SHEETS_NUM_RANK[rank], 'price' => SHEETS_PRICE[rank] + event['price']}
+        end
+
+        reservations.each do |reservation|
+          sheet_rank = sheets_rank(reservation['sheet_id'])
+          event['remains'] -= 1
+          event['sheets'][sheet_rank]['remains'] -= 1
+        end
+
+        event['public'] = event.delete('public_fg')
+        event['closed'] = event.delete('closed_fg')
+
+        event
       end
 
       def get_event(event_id, login_user_id = nil)
@@ -243,8 +267,8 @@ module Torb
 
       rows = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id WHERE r.user_id = ? ORDER BY IFNULL(r.canceled_at, r.reserved_at) DESC LIMIT 5', user['id'])
       recent_reservations = rows.map do |row|
-        event = get_event(row['event_id'])
-        price = event['sheets'][row['sheet_rank']]['price']
+        event = get_event_no_detail(row['event_id'])
+        price = event['price'] + SHEETS_PRICE[row['sheet_rank']]
         event.delete('sheets')
         event.delete('total')
         event.delete('remains')
@@ -265,7 +289,7 @@ module Torb
 
       rows = db.xquery('SELECT event_id FROM reservations WHERE user_id = ? GROUP BY event_id ORDER BY MAX(IFNULL(canceled_at, reserved_at)) DESC LIMIT 5', user['id'])
       recent_events = rows.map do |row|
-        event = get_event(row['event_id'])
+        event = get_event_no_detail(row['event_id'])
         event['sheets'].each {|_, sheet| sheet.delete('detail')}
         event
       end
@@ -454,13 +478,11 @@ module Torb
     end
 
     get '/admin/api/reports/events/:id/sales', admin_login_required: true do |event_id|
-      event = get_event(event_id)
-
-      reservations = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event['id'])
+      reservations = db.xquery('SELECT r.*, s.rank AS sheet_rank, s.num AS sheet_num, s.price AS sheet_price, e.price AS event_price FROM reservations r INNER JOIN sheets s ON s.id = r.sheet_id INNER JOIN events e ON e.id = r.event_id WHERE r.event_id = ? ORDER BY reserved_at ASC FOR UPDATE', event_id)
       reports = reservations.map do |reservation|
         {
             reservation_id: reservation['id'],
-            event_id: event['id'],
+            event_id: event_id,
             rank: reservation['sheet_rank'],
             num: reservation['sheet_num'],
             user_id: reservation['user_id'],
